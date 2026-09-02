@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 """Shared utility: Tracy-style visual pairwise alignment formatter.
 
-Usage (from another script in the same directory):
-    import sys
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from alignment_viz import format_alignment
+Number-prefixed modules are loaded through ``importlib``. See
+``scripts/README.md`` for the canonical import pattern.
 """
 from __future__ import annotations
 

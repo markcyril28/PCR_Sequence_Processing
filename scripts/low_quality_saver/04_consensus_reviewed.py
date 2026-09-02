@@ -10,7 +10,8 @@ write a consensus FASTA next to the inputs:
     <stem>.consensus.fa
     <stem>.consensus.report.tsv
 
-Consensus rules per aligned column (mirrors pairwise_consensus.py):
+Consensus rules per aligned column (mirrors
+``scripts/merge_consensus/01_pairwise_consensus.py``):
     * both gaps                       -> skip
     * one gap, base passes min-Q      -> take the base
     * one gap, base below min-Q       -> N
@@ -23,6 +24,7 @@ Consensus rules per aligned column (mirrors pairwise_consensus.py):
 from __future__ import annotations
 
 import argparse
+import importlib
 import sys
 from pathlib import Path
 
@@ -30,8 +32,11 @@ from Bio import SeqIO
 from Bio.Align import PairwiseAligner
 from Bio.Seq import Seq
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from alignment_viz import format_alignment
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(PROJECT_ROOT))
+format_alignment = importlib.import_module(
+    "scripts.common.02_alignment_viz"
+).format_alignment
 
 IUPAC_PAIR = {
     frozenset("AG"): "R", frozenset("CT"): "Y", frozenset("GC"): "S",

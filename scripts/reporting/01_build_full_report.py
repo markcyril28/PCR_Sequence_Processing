@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""build_full_report.py
-=======================
+"""01_build_full_report.py
+==========================
 One big rerunnable script that aggregates every artifact this PCR_Sequence
 workspace produces (chromatograms, quality classification, merge_consensus
 pipeline result, trace-review per-strand alignment, attempted merged
@@ -8,12 +8,12 @@ trace-review consensus) into a single Markdown report. The report is
 PDF-ready (e.g. via `pandoc Report.md -o Report.pdf` or VS Code "Markdown
 PDF").
 
-Standalone: not wired into either pipeline shell script. Just run it.
+Called by ``c_build_report.sh`` and also available as a standalone CLI.
 
 Usage:
-    python scripts/build_full_report.py
-    python scripts/build_full_report.py --workspace /path/to/PCR_Sequence
-    python scripts/build_full_report.py --no-chromatograms   # text-only
+    python scripts/reporting/01_build_full_report.py
+    python scripts/reporting/01_build_full_report.py --workspace /path/to/PCR_Sequence
+    python scripts/reporting/01_build_full_report.py --no-chromatograms
 
 Idempotent: rerunning overwrites the report and refreshes PNGs.
 """
@@ -26,7 +26,7 @@ from pathlib import Path
 import os
 
 # Default workspace = the parent of this scripts/ folder. Override with --workspace.
-DEFAULT_WORKSPACE = Path(__file__).resolve().parent.parent
+DEFAULT_WORKSPACE = Path(__file__).resolve().parents[2]
 
 # --- input locations (relative to workspace) -----------------------------
 #
@@ -154,6 +154,7 @@ GENE_ORDER = [
 import argparse
 import csv
 import datetime as dt
+import importlib
 import io
 import re
 import shutil
@@ -163,10 +164,12 @@ import tomllib
 from collections import defaultdict
 from typing import Optional
 
-# Allow importing trim_reads from the scripts/ directory we live in.
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+# Import the numbered shared module through its canonical package name.
+sys.path.insert(0, str(DEFAULT_WORKSPACE))
 try:
-    from trim_reads import mott_trim  # type: ignore
+    mott_trim = importlib.import_module(
+        "scripts.common.03_trim_reads"
+    ).mott_trim
 except Exception:  # pragma: no cover - degrade gracefully if module missing
     mott_trim = None  # type: ignore
 
@@ -1069,7 +1072,7 @@ def _load_batches_from_toml(workspace: Path) -> list[dict]:
 def main() -> int:
     ap = argparse.ArgumentParser(description="Build the one-big PCR_Sequence pipeline Markdown report.")
     ap.add_argument("--workspace", type=Path, default=DEFAULT_WORKSPACE,
-                    help="PCR_Sequence workspace root (default: parent of this script).")
+                    help="PCR_Sequence workspace root (default: inferred from this script).")
     ap.add_argument("--no-chromatograms", action="store_true",
                     help="Skip rendering .ab1 -> PNG (faster, text-only report).")
     ap.add_argument("--batch", action="append", default=None,

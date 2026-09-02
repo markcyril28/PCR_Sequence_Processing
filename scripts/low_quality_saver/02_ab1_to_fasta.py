@@ -8,13 +8,15 @@ flanks that the basecaller did not mark as N.
 from __future__ import annotations
 
 import argparse
+import importlib
 import sys
 from pathlib import Path
 
 from Bio import SeqIO
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from trim_reads import slice_trim
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(PROJECT_ROOT))
+slice_trim = importlib.import_module("scripts.common.03_trim_reads").slice_trim
 
 
 def main() -> int:

@@ -20,7 +20,7 @@ The trim is conservative: if the read is short or the trimmed interval would
 fall below `min_len`, the FULL read is returned unchanged.
 
 CLI (diagnostic):
-    python trim_reads.py read.ab1 --q 20
+    python scripts/common/03_trim_reads.py read.ab1 --q 20
 """
 from __future__ import annotations
 

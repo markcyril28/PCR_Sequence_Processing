@@ -101,7 +101,7 @@ def main() -> int:
         "consensus_dirs":    [_rel(d, output_root) for d in consensus_dirs],
     }
 
-    # Per-consensus N% summary. step_merge_consensus.py emits files named
+    # Per-consensus N% summary. 07_step_merge_consensus.py emits files named
     # "<base>_consensus.fa"; older runs may have used "<base>.consensus.fa".
     # Each consensus dir corresponds to one method, so tag every row with the
     # source dir's basename so downstream consumers can tell methods apart.

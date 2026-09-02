@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""overlap_consensus_report.py
-==============================
+"""02_overlap_consensus_report.py
+==================================
 Build a Markdown summary report from the overlap_consensus output directory
-produced by overlap_consensus.py + the overlap_consensus_blast step in
+produced by 01_overlap_consensus.py + the overlap_consensus_blast step in
 f_inside_primer_pipeline.sh.
 
 Reads from <output_dir>:
@@ -19,9 +19,9 @@ Writes:
   <output_dir>/overlap_consensus_report.md
 
 Usage:
-    python scripts/overlap_consensus_report.py \
+    python scripts/inside_primer/02_overlap_consensus_report.py \
         --output-dir III_PipelineOutput/HC01109784/inside_primer_overlap_consensus
-    python scripts/overlap_consensus_report.py \
+    python scripts/inside_primer/02_overlap_consensus_report.py \
         --output-dir /abs/path/to/inside_primer_overlap_consensus \
         [--workspace /path/to/PCR_Sequence]
 """
@@ -416,7 +416,7 @@ def main() -> int:
 
     output_dir = args.output_dir
     if not output_dir.is_absolute():
-        ws = (args.workspace or Path(__file__).resolve().parent.parent).resolve()
+        ws = (args.workspace or Path(__file__).resolve().parents[2]).resolve()
         output_dir = ws / output_dir
     output_dir = output_dir.resolve()
 

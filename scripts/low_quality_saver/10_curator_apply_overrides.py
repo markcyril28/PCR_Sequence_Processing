@@ -6,8 +6,8 @@ the two reviewed strands is unreliable, they record that decision in
 `05_Report/curator_decisions.tsv`. This script rebuilds the affected
 04a consensus FASTA from the chosen strand's `.reviewed.fa`, projected onto
 reference coordinates so the output length matches the reference (matching the
-two-strand consensus produced by `step_merge_consensus.py`). This keeps the
-downstream `tri_consensus_pipeline.sh` (which requires equal-length inputs)
+two-strand consensus produced by `07_step_merge_consensus.py`). This keeps the
+downstream `d_tri_consensus_pipeline.sh` (which requires equal-length inputs)
 compatible with curator-overridden amplicons.
 
 Inputs (relative to the batch's `low_quality_saver_pipeline/` directory):

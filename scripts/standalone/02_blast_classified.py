@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-blast_classified.py: BLAST every .ab1 read inside a tier-classified folder
+02_blast_classified.py: BLAST every .ab1 read inside a tier-classified folder
 against the reference DMP transcripts and emit pairwise alignments.
 
 Walks <classified_root>/<tier>/<sample>/*.ab1, converts each trace to FASTA,
@@ -90,7 +90,7 @@ def best_hit_row(tab_file: Path) -> list[str] | None:
 
 
 def main() -> int:
-    here = Path(__file__).resolve().parent.parent
+    here = Path(__file__).resolve().parents[2]
 
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--classified-root", type=Path, default=here / DEFAULT_CLASSIFIED_ROOT)

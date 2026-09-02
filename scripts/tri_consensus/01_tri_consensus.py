@@ -23,11 +23,15 @@ and a class label: AGREE_ALL, SANGER_VARIANT, SANGER_ASSIST_REF, REF_FALLBACK.
 from __future__ import annotations
 
 import argparse
+import importlib
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from alignment_viz import format_alignment  # noqa: E402
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(PROJECT_ROOT))
+format_alignment = importlib.import_module(
+    "scripts.common.02_alignment_viz"
+).format_alignment
 
 UNAMBIG = set("ACGT")
 

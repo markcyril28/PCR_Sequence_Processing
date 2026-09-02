@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import importlib
 import shutil
 import subprocess
 import sys
@@ -36,11 +37,17 @@ from Bio import SeqIO
 from Bio.Align import PairwiseAligner
 from Bio.Seq import Seq
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from alignment_viz import format_alignment
-from trim_reads import mask_trim
-from consensus_reviewed import _pairs as _consensus_pairs
-from consensus_reviewed import _process_pair as _consensus_process_pair
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(PROJECT_ROOT))
+format_alignment = importlib.import_module(
+    "scripts.common.02_alignment_viz"
+).format_alignment
+mask_trim = importlib.import_module("scripts.common.03_trim_reads").mask_trim
+_consensus_reviewed = importlib.import_module(
+    "scripts.low_quality_saver.04_consensus_reviewed"
+)
+_consensus_pairs = _consensus_reviewed._pairs
+_consensus_process_pair = _consensus_reviewed._process_pair
 
 IUPAC = {
     frozenset("AG"): "R", frozenset("CT"): "Y", frozenset("GC"): "S",
@@ -488,7 +495,7 @@ def _emit_pair_consensus(args) -> None:
     """For each per-sample subdir under out-dir, pair every reviewed F/R FASTA
     and write <base>.consensus.fa alongside the inputs.
 
-    Reuses ``consensus_reviewed._pairs`` and ``_process_pair`` so the merge
+    Reuses ``04_consensus_reviewed._pairs`` and ``_process_pair`` so the merge
     logic stays in one place and matches the standalone tool's behavior.
     """
     cons_args = argparse.Namespace(

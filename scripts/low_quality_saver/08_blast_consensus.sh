@@ -4,16 +4,16 @@
 # plus a single aggregated assignments TSV.
 #
 # Usage:
-#   scripts/blast_consensus.sh <in_dir> <out_dir> [reference.fa]
+#   scripts/low_quality_saver/08_blast_consensus.sh <in_dir> <out_dir> [reference.fa]
 #
 # Designed to be invoked from inside the pcr_sanger conda env (which provides
 # makeblastdb / blastn). Safe to re-run; reuses any DB already built under
 # <out_dir>/db.
 set -Eeuo pipefail
 
-IN_DIR="${1:?usage: blast_consensus.sh <in_dir> <out_dir> [reference.fa]}"
-OUT_DIR="${2:?usage: blast_consensus.sh <in_dir> <out_dir> [reference.fa]}"
-ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+IN_DIR="${1:?usage: 08_blast_consensus.sh <in_dir> <out_dir> [reference.fa]}"
+OUT_DIR="${2:?usage: 08_blast_consensus.sh <in_dir> <out_dir> [reference.fa]}"
+ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 REF="${3:-$ROOT/II_QualityClassified/PF05078_DMP_transcripts_cdhit.fa}"
 THREADS="${THREADS:-$(nproc 2>/dev/null || echo 4)}"
 EVALUE="${EVALUE:-1e-5}"

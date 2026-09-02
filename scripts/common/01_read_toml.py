@@ -2,9 +2,9 @@
 """Tiny TOML reader for bash pipelines.
 
 Usage:
-    python read_toml.py <config.toml> <dotted.key>
-    python read_toml.py <config.toml> --export        # KEY=value lines (uppercased, dots->_)
-    python read_toml.py <config.toml> --batches       # TSV of [[batches]] table with defaults
+    python scripts/common/01_read_toml.py <config.toml> <dotted.key>
+    python scripts/common/01_read_toml.py <config.toml> --export
+    python scripts/common/01_read_toml.py <config.toml> --batches
 
 The flat exporter skips any array-of-tables sections (e.g. `[[batches]]`) so
 they do not produce malformed KEY='...' lines. Use --batches to consume them.

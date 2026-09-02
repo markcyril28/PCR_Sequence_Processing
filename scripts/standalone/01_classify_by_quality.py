@@ -22,7 +22,7 @@ import csv
 import shutil
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 RAW_DATA_ROOT = ROOT / "I_Raw_Sequence_Data"
 OUTPUT_ROOT = ROOT / "II_QualityClassified"
 

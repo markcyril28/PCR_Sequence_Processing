@@ -3,7 +3,7 @@
 
 Reads a forward .ab1 and a reverse .ab1, reverse-complements the reverse read
 (and reverses its quality vector), pairwise-aligns the two strands, and emits
-a single consensus FASTA. Used by merge_pipeline.sh.
+a single consensus FASTA. Used by ``a_merge_consensus_pipeline.sh``.
 
 Consensus rules (per aligned column):
     * Both gaps                    -> skip
@@ -19,6 +19,7 @@ Consensus rules (per aligned column):
 from __future__ import annotations
 
 import argparse
+import importlib
 import sys
 from pathlib import Path
 
@@ -26,9 +27,12 @@ from Bio import SeqIO
 from Bio.Align import PairwiseAligner
 from Bio.Seq import Seq
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from alignment_viz import format_alignment
-from trim_reads import mask_trim
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(PROJECT_ROOT))
+format_alignment = importlib.import_module(
+    "scripts.common.02_alignment_viz"
+).format_alignment
+mask_trim = importlib.import_module("scripts.common.03_trim_reads").mask_trim
 
 IUPAC = {
     frozenset("AG"): "R", frozenset("CT"): "Y", frozenset("GC"): "S",

@@ -13,6 +13,7 @@ Outputs (per read) under <out-dir>/<sample>/:
 from __future__ import annotations
 
 import argparse
+import importlib
 import sys
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
@@ -21,9 +22,12 @@ from Bio import SeqIO
 from Bio.Align import PairwiseAligner
 from Bio.Seq import Seq
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from alignment_viz import format_alignment
-from trim_reads import mask_trim
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(PROJECT_ROOT))
+format_alignment = importlib.import_module(
+    "scripts.common.02_alignment_viz"
+).format_alignment
+mask_trim = importlib.import_module("scripts.common.03_trim_reads").mask_trim
 
 
 def _read_assignments(path: Path) -> dict[tuple[str, str], str]:
