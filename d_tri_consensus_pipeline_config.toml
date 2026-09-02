@@ -1,0 +1,81 @@
+# =============================================================================
+# d_tri_consensus_pipeline_config.toml
+#
+# Configuration for d_tri_consensus_pipeline.sh - builds a per-amplicon
+# majority-rule consensus across two Sanger batches and the reference.
+#
+# For every amplicon present in BOTH batches (matched by the `ref=` accession
+# in each consensus FASTA header), the orchestrator calls
+# scripts/tri_consensus.py with:
+#   - sanger_a   : consensus FASTA from batch A
+#   - sanger_b   : consensus FASTA from batch B
+#   - reference  : reference FASTA shared between the two batches
+#
+# Outputs are written to:
+#   {io.output_root}/{io.output_dirname}/{gene_id}_tri_consensus.fa
+#   {io.output_root}/{io.output_dirname}/{gene_id}_tri_consensus.report.tsv
+#   {io.output_root}/{io.output_dirname}/tri_consensus_summary.tsv
+# =============================================================================
+
+[project]
+name = "SmelDMP_Tri_Consensus"
+
+[io]
+# Top-level parent that already contains each batch's pipeline output.
+output_root    = "III_PipelineOutput"
+# Folder name (under output_root) that this pipeline writes into. Acts as the
+# third folder beside the two batch folders.
+output_dirname = "Tri_Consensus"
+
+[batch_a]
+id            = "HC01463503"
+# Directory holding the per-amplicon consensus FASTAs for batch A. Points at
+# 04a_Consensus_TraceReview because tri_consensus.py requires reference-length
+# inputs and the 04a files (built by step_merge_consensus.py or
+# curator_apply_overrides.py) are already projected onto reference coordinates.
+# Relative paths are resolved against output_root.
+consensus_dir = "HC01463503/low_quality_saver_pipeline/04a_Consensus_TraceReview/I_HC01463503"
+# Reference directory used by batch A (the orchestrator only needs one of the
+# two; both batches share the same reference set in this study).
+reference_dir = "HC01463503/low_quality_saver_pipeline/03a_TraceReview/_ref"
+
+[batch_b]
+id            = "HC01468262"
+consensus_dir = "HC01468262/low_quality_saver_pipeline/04a_Consensus_TraceReview/I_HC01468262"
+reference_dir = "HC01468262/low_quality_saver_pipeline/03a_TraceReview/_ref"
+
+[consensus]
+# Filename pattern for output FASTAs (one per shared amplicon).
+fasta_suffix  = "_tri_consensus.fa"
+report_suffix = "_tri_consensus.report.tsv"
+# Tracy-style block alignment of tri-consensus vs reference (matches the
+# `*.ref_align.txt` files produced by the trace-review step).
+align_suffix  = "_tri_consensus.ref_align.txt"
+# Per-run summary written under output_root/output_dirname.
+summary_filename = "tri_consensus_summary.tsv"
+
+[inputs]
+# Subfolder (under output_root/output_dirname) where the orchestrator stashes
+# a verbatim copy of every sanger_a / sanger_b / reference FASTA consumed by
+# tri_consensus.py. Each copy is renamed "<ref_accession>.<role>.<basename>"
+# and its original filepath is recorded in `manifest_filename`.
+stash_dirname     = "_inputs"
+manifest_filename = "inputs_manifest.tsv"
+
+[blast]
+# Re-BLAST every tri-consensus against the multi-gene DMP reference to
+# confirm that each consensus still best-hits its expected ref accession.
+enabled    = true
+# Multi-gene reference FASTA (same one used by low_quality_saver_pipeline).
+# Resolved relative to the orchestrator's directory.
+reference  = "II_QualityClassified/PF05078_DMP_transcripts_cdhit.fa"
+threads    = 4
+evalue     = "1e-5"
+word_size  = 9
+min_pident = 70.0
+min_qcov   = 20.0
+# Per-run BLAST assignments written under output_root/output_dirname.
+assignments_filename = "tri_consensus_blast.tsv"
+
+[logging]
+level = "INFO"
