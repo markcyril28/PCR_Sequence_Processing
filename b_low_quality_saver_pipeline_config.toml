@@ -1,0 +1,269 @@
+# =============================================================================
+# PCR_Sequence reference-guided basecalling pipeline — configuration
+#
+# 1. Pick a METHOD (= which scientific approach to use).
+# 2. Pick which STEPS to run (preprocessing/QC steps run regardless of method).
+# 3. Each step writes into its own subfolder under [project].output_dir,
+#    named per the [output] table.
+# =============================================================================
+
+[project]
+name             = "SmelDMP_RefGuided"
+sample_root      = "I_Raw_Sequence_Data"                          # parent folder of all per-sample batch dirs
+reference        = "II_QualityClassified/PF05078_DMP_transcripts_cdhit.fa"
+output_root      = "III_PipelineOutput"                           # top-level parent (one subdir per [[batches]] entry)
+pipeline_dirname = "low_quality_saver_pipeline"                   # subfolder under {output_root}/{batch.id}/ for this pipeline
+threads          = 4
+# Restrict downstream steps (blast/call/consensus) to reads whose Phred tier
+# (from the classify step's quality_report.csv) is in this list. Comment a
+# tier out to skip it. Leave all three uncommented to process every read.
+tiers            = [
+    "1_HighQuality",
+    "2_MediumQuality",
+    "3_LowQuality",
+]
+# Which [[batches]] entries to process this run. Comment a batch id out to
+# skip it without losing the [[batches]] block below. Removing the list (or
+# leaving it empty) processes every defined batch.
+active_batches   = [
+    "HC01463503",
+    "HC01468262",
+]
+
+# ---------------------------------------------------------------------------
+# [[batches]] — one per Sanger sequencing batch. Each batch is processed
+# independently and its outputs live under:
+#   {project.output_root}/{batch.id}/{project.pipeline_dirname}/...
+#
+# Fields:
+#   id              — short ID used as the output subfolder (e.g. "HC01463503").
+#   sample_dir      — directory under {project.sample_root} that holds the
+#                     batch's .ab1 traces (the sample folder name itself is
+#                     preserved in classified/blasted outputs).
+#   forward_glob /  — override per-batch when the upstream lab uses a different
+#   reverse_glob      filename convention (e.g. Macrogen uses *F.ab1 / *R.ab1
+#                     instead of *_forward.ab1 / *_reverse.ab1). Defaults are
+#                     inherited from the global [reads] section below.
+#   forward_suffix  — substring at the end of the read STEM (filename minus
+#   reverse_suffix    .ab1) that identifies strand. Used by classify and
+#                     trace-review to pair forward/reverse reads. Defaults are
+#                     inherited from [reads].
+# ---------------------------------------------------------------------------
+[[batches]]
+id             = "HC01463503"
+sample_dir     = "I_HC01463503"
+# uses default [reads] values (*_forward.ab1 / *_reverse.ab1)
+
+[[batches]]
+id             = "HC01468262"
+sample_dir     = "I_HC01468262"
+forward_glob   = "*F.ab1"
+reverse_glob   = "*R.ab1"
+forward_suffix = "F"
+reverse_suffix = "R"
+
+# ---------------------------------------------------------------------------
+# [method] — which of the three reference-guided approaches to apply.
+#
+#   "trace_review"   (Approach 1, RECOMMENDED)
+#       Align KB-basecalled reads to the reference, then re-inspect the
+#       chromatogram at every mismatch / low-Q (<min_quality) position and
+#       overwrite the base ONLY if the trace supports the reference allele
+#       (secondary/primary peak ratio test). Implemented locally with
+#       Biopython + ABI trace inspection; Tracy is used for het-indel
+#       decomposition when `tracy_for_indels = true`.
+#
+#   "consensus_assembly"   (Approach 2)
+#       Map forward + reverse .ab1 reads to the reference and resolve
+#       disagreements by quality-weighted voting. No trace re-editing.
+#
+#   "tracy_decompose"   (Approach 3, closest to "ref-guided re-basecalling")
+#       Run Tracy `align` (single trace) or `decompose` (het-indel) against
+#       the reference and emit Tracy's corrected consensus + per-read VCF.
+# ---------------------------------------------------------------------------
+[method]
+# *** CRITICAL *** picks the basecalling algorithm; list multiple to run all.
+choice = [
+    "trace_review",
+    #"consensus_assembly",
+    #"tracy_decompose"
+]   # one or more of: trace_review | consensus_assembly | tracy_decompose
+
+# ---------------------------------------------------------------------------
+# [run] — toggle pipeline steps. Steps run in this fixed order; later steps
+# consume earlier steps' output. A step is skipped if its toggle is false OR
+# its inputs are missing.
+#
+#   classify  — Phred-tier QC classification of every .ab1
+#   blast     — assign each forward read to its best DMP transcript
+#   call      — execute the chosen [method] (writes to a method-specific folder)
+#   consensus — merge forward + reverse strand calls into one FASTA per amplicon
+#               (only meaningful for trace_review and consensus_assembly;
+#                tracy_decompose already produces a consensus per read)
+#   consensus_blast — blast each merged-consensus FASTA back against the DMP
+#               reference to confirm paralog assignment and produce
+#               per-consensus pairwise alignments.
+#   report    — summary CSV + run manifest
+#   build_report - invoke c_build_report.sh after the batch loop to produce the
+#               consolidated Markdown / PDF report (build_full_report.py +
+#               pandoc). Runs once across all batches, not per-batch.
+#
+# `mode` is a convenience preset; set to "custom" to honor the booleans below.
+#   mode = "qc"       -> classify only
+#   mode = "assign"   -> classify + blast
+#   mode = "call"     -> classify + blast + call
+#   mode = "full"     -> all steps (including build_report)
+#   mode = "custom"   -> use per-step booleans
+# ---------------------------------------------------------------------------
+[run]
+mode            = "full"
+classify        = true
+blast           = true
+call            = true
+consensus       = true
+consensus_blast = true
+report          = true
+build_report    = true   # true = run c_build_report.sh after the batch loop
+overwrite       = true   # true = overwrite existing output files; false = skip steps whose output already exists
+
+# ---------------------------------------------------------------------------
+# [output] — subfolder name for each step (created under project.output_dir)
+# The "call" step's folder is chosen automatically based on [method].choice
+# (see [output.call_dirs]).
+# ---------------------------------------------------------------------------
+[output]
+classify  = "01_QualityClassified"
+blast     = "02_BlastAssignment"
+report    = "05_Report"
+
+[output.call_dirs]
+trace_review        = "03a_TraceReview"
+consensus_assembly  = "03b_ConsensusAssembly"
+tracy_decompose     = "03c_TracyDecompose"
+
+# Per-method merged-consensus output folders. Each [method] writes its merged
+# forward+reverse consensus into its own folder so results from different
+# methods do not overwrite each other. tracy_decompose has no entry because
+# it already produces a per-read consensus and skips the merge step.
+[output.consensus_dirs]
+trace_review        = "04a_Consensus_TraceReview"
+consensus_assembly  = "04b_Consensus_ConsensusAssembly"
+
+# Per-method consensus-BLAST output folders. Each [method]'s merged-consensus
+# FASTAs are blasted against the DMP reference; results live alongside the
+# consensus folder using the same per-sample subdirectory layout.
+[output.consensus_blast_dirs]
+trace_review        = "04a_BlastConsensus_TraceReview"
+consensus_assembly  = "04b_BlastConsensus_ConsensusAssembly"
+
+# ===========================================================================
+# Step-specific parameters
+# ===========================================================================
+
+[reads]
+# Default forward/reverse read identification. A [[batches]] entry may override
+# any of these per-batch when the lab uses a different filename convention.
+forward_glob   = "*_forward.ab1"
+reverse_glob   = "*_reverse.ab1"
+forward_suffix = "_forward"          # trailing stem suffix that marks the forward strand
+reverse_suffix = "_reverse"          # trailing stem suffix that marks the reverse strand
+
+# ---------------------------------------------------------------------------
+# [trim] — Mott end-trimming (applied to .ab1 reads BEFORE BLAST + per-method
+# call + F+R consensus). Internal Ns are alignment-safe, but noisy END
+# regions get miscalled as A/C/G/T and can drag global alignments and the
+# merged consensus toward the wrong base. Set q_cutoff = 0 to disable.
+# ---------------------------------------------------------------------------
+[trim]
+enabled  = true
+# *** CRITICAL *** end-trim Phred floor. Low-peak permissive: 10 (was 20).
+q_cutoff = 10
+min_len  = 50    # keep untrimmed if trim leaves fewer bases than this
+
+[classify]
+# Low-peak permissive: 30/10 (was 40/20) so weak reads still reach Medium.
+high_threshold   = 30.0
+medium_threshold = 10.0
+tiers = ["1_HighQuality", "2_MediumQuality", "3_LowQuality"]
+
+[blast]
+# *** CRITICAL *** ref assignment; too strict = NO_HIT, too loose = wrong
+# paralog. Low-peak permissive values below; raise pident if you see
+# cross-paralog misassignments in assignments.tsv.
+evalue     = "1e-5"         # was 1e-10
+word_size  = 9              # was 11 (smaller seeds find weak hits)
+min_pident = 70.0           # was 80.0
+min_qcov   = 20.0           # was 30.0
+
+# ---------------------------------------------------------------------------
+# Method 1 — Reference-guided trace review / editing
+# ---------------------------------------------------------------------------
+[trace_review]
+# *** CRITICAL *** re-inspect bases below this Phred. Low-peak: 5 (was 10) so
+# we don't trigger mass re-inspection when ALL bases are weak.
+min_quality          = 5
+# *** CRITICAL *** secondary/primary peak ratio for het (IUPAC) call. Low-peak:
+# 0.5 (was 0.33) so noisy weak secondary peaks aren't mis-called as hets.
+secondary_peak_ratio = 0.5
+# *** CRITICAL *** with require_trace_support=true this only fixes low-Q bases
+# when the trace actually shows the ref base (variant-safe). Keep both true.
+allow_ref_overwrite  = true
+require_trace_support = true
+mark_uncalled        = "N"
+tracy_for_indels     = true
+het_indel_trigger    = 0.50    # was 0.30; avoid over-triggering on low peaks
+# *** CRITICAL *** read-level rejection. Low-peak: 0.98 (was 0.85) so almost
+# every read survives even when most bases are low-Q.
+max_low_q_frac       = 0.98
+threads              = 4
+
+# ---------------------------------------------------------------------------
+# Method 2 — Reference-anchored consensus assembly (quality-weighted voting)
+# ---------------------------------------------------------------------------
+[consensus_assembly]
+aligner          = "biopython"   # biopython | minimap2 | phrap
+# *** CRITICAL *** per-strand masking floor. Low-peak: 5 (was 10).
+min_base_quality = 5
+# *** CRITICAL *** F/R conflict policy: higher_q | iupac | n.
+disagreement     = "higher_q"
+min_coverage     = 1             # 1 = single-strand ok, 2 = require both
+gap_open         = -4
+gap_extend       = -1
+threads          = 4
+
+# ---------------------------------------------------------------------------
+# Method 3 — Tracy reference-guided basecalling / decomposition
+# ---------------------------------------------------------------------------
+[tracy_decompose]
+# *** CRITICAL *** align | decompose | auto.
+mode             = "auto"
+# *** CRITICAL *** het threshold (mirror of trace_review.secondary_peak_ratio).
+# Low-peak: 0.5 (was 0.33).
+pratio           = 0.5
+trim_left        = 50
+trim_right       = 50
+# *** CRITICAL *** Tracy's own end-trim Phred. Low-peak: 10 (was 20).
+trim_quality     = 10
+call_variants    = true
+kmer             = 15
+auto_decompose_q = 25.0
+# *** CRITICAL *** read-level rejection. Low-peak: 0.98 (was 0.85).
+max_low_q_frac   = 0.98
+# Parallel tracy invocations across reads. tracy itself is single-threaded
+# per trace, but reads are independent so we run N subprocesses concurrently.
+# Defaults to [project].threads when omitted/blank.
+threads          = 4
+
+# ---------------------------------------------------------------------------
+# [consensus] — merging step (used by trace_review and consensus_assembly)
+# ---------------------------------------------------------------------------
+[consensus]
+# *** CRITICAL *** per-strand Phred floor at F+R merge. Low-peak: 5 (was 10).
+min_strand_q = 5
+# *** CRITICAL *** F/R conflict policy at the LAST decision point.
+# iupac = ambiguity (variant-safe) | n = mask | higher_q = pick higher-Phred.
+disagreement = "iupac"
+min_coverage = 1            # 1 = single-strand ok, 2 = require both
+
+[logging]
+level = "INFO"              # DEBUG | INFO | WARN | ERROR
