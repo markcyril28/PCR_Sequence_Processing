@@ -1,0 +1,181 @@
+# =============================================================================
+# f_inside_primer_pipeline_config.toml
+#
+# Separate low-quality saver pipeline config for I_HC01109784.
+#
+# This sample has inside and outside primers for one final DNA molecule. The
+# pair-review stage is split into two virtual batches that point to the same
+# raw folder but use different primer suffixes (one per physical primer pair):
+#   HC01109784_PH_2_DMP8 : PH_2_DMP8-OF + PH_2_DMP8-IR  (outer-F + inner-R)
+#   HC01109784_PH_3_DMP8 : PH_3_DMP8-IF + PH_3_DMP8-OR  (inner-F + outer-R)
+# A final overlap-consensus stage merges those two pair consensuses into one
+# full-gene consensus for PH_DMP8.
+# =============================================================================
+
+[project]
+name             = "SmelDMP_InsidePrimer_RefGuided"
+sample_root      = "I_Raw_Sequence_Data"
+reference        = "II_QualityClassified/PF05078_DMP_transcripts_cdhit.fa"
+output_root      = "III_PipelineOutput"
+pipeline_dirname = "low_quality_saver_pipeline"
+threads          = 4
+tiers            = [
+    "1_HighQuality",
+    "2_MediumQuality",
+    "3_LowQuality",
+]
+active_batches   = [
+    "HC01109784_PH_2_DMP8",
+    "HC01109784_PH_3_DMP8",
+]
+
+[[batches]]
+id             = "HC01109784_PH_2_DMP8"     # primer pair PH_2: outer-F + inner-R
+sample_dir     = "I_HC01109784"
+forward_glob   = "*-OF.ab1"
+reverse_glob   = "*-IR.ab1"
+forward_suffix = "-OF"
+reverse_suffix = "-IR"
+
+[[batches]]
+id             = "HC01109784_PH_3_DMP8"     # primer pair PH_3: inner-F + outer-R
+sample_dir     = "I_HC01109784"
+forward_glob   = "*-IF.ab1"
+reverse_glob   = "*-OR.ab1"
+forward_suffix = "-IF"
+reverse_suffix = "-OR"
+
+[method]
+choice = [
+    "trace_review",
+]
+
+[run]
+# Steps run in the order listed. Pipeline executes only what appears here;
+# remove or comment a step to skip it. `call` runs whichever method(s) are
+# listed in [method].choice (here: trace_review). `overlap_consensus` runs
+# AFTER both batches finish, merging their per-pair consensuses into the
+# single PH_DMP8 full-gene consensus defined in [overlap_consensus].
+#
+# Per-batch BLAST is skipped here: the target paralog is known (DMP8 =
+# SMEL4.1_10g015200.1.01) so [blast].force_assign pins every read to that
+# reference, bypassing BLAST classification. Specificity is then confirmed
+# end-to-end by `overlap_consensus_blast`, which BLASTs the final stitched
+# PH_DMP8_full_gene FASTA back against the 7-paralog reference.
+mode       = "full"
+overwrite  = true
+operations = [
+    "classify",
+    #"blast",                # skipped: pre-assigned via [blast].force_assign
+    "trace_review",          # alias for 'call' since [method].choice = ["trace_review"]
+    "consensus",
+    #"consensus_blast",      # skipped: per-pair BLAST not needed; final check below
+    "report",
+    "overlap_consensus",
+    "overlap_consensus_blast",
+]
+
+[output]
+classify  = "01_QualityClassified"
+blast     = "02_BlastAssignment"
+report    = "05_Report"
+
+[output.call_dirs]
+trace_review        = "03a_TraceReview"
+consensus_assembly  = "03b_ConsensusAssembly"
+tracy_decompose     = "03c_TracyDecompose"
+
+[output.consensus_dirs]
+trace_review        = "04a_Consensus_TraceReview"
+consensus_assembly  = "04b_Consensus_ConsensusAssembly"
+
+[output.consensus_blast_dirs]
+trace_review        = "04a_BlastConsensus_TraceReview"
+consensus_assembly  = "04b_BlastConsensus_ConsensusAssembly"
+
+[reads]
+forward_glob   = "*_forward.ab1"
+reverse_glob   = "*_reverse.ab1"
+forward_suffix = "_forward"
+reverse_suffix = "_reverse"
+
+[trim]
+enabled  = true
+q_cutoff = 10
+min_len  = 50
+
+[classify]
+high_threshold   = 30.0
+medium_threshold = 10.0
+tiers = ["1_HighQuality", "2_MediumQuality", "3_LowQuality"]
+
+[blast]
+evalue     = "1e-5"
+word_size  = 9
+min_pident = 70.0
+min_qcov   = 20.0
+# When 'blast' is NOT in [run].operations and this key is set, the pipeline
+# synthesizes assignments.tsv by pinning every read to this reference (must
+# match the sseqid = first whitespace-separated token of a FASTA header in
+# [project].reference). Bypasses per-read BLAST classification entirely.
+force_assign = "SMEL4.1_10g015200.1.01"   # DMP8 = SmelDMPv5_10.610 (genomic, intron-bearing entry)
+
+[trace_review]
+min_quality           = 5
+secondary_peak_ratio  = 0.5
+allow_ref_overwrite   = true
+require_trace_support = true
+mark_uncalled         = "N"
+tracy_for_indels      = true
+het_indel_trigger     = 0.50
+max_low_q_frac        = 0.98
+threads               = 4
+
+[consensus_assembly]
+aligner          = "biopython"
+min_base_quality = 5
+disagreement     = "higher_q"
+min_coverage     = 1
+gap_open         = -4
+gap_extend       = -1
+threads          = 4
+
+[tracy_decompose]
+mode             = "auto"
+pratio           = 0.5
+trim_left        = 50
+trim_right       = 50
+trim_quality     = 10
+call_variants    = true
+kmer             = 15
+auto_decompose_q = 25.0
+max_low_q_frac   = 0.98
+threads          = 4
+
+[consensus]
+min_strand_q = 5
+disagreement = "iupac"
+min_coverage = 1
+
+[logging]
+level = "INFO"
+
+[overlap_consensus]
+enabled = true
+seq_id = "PH_DMP8_full_gene"
+output_dir = "III_PipelineOutput/HC01109784/inside_primer_overlap_consensus"
+input_fastas = [
+    "III_PipelineOutput/HC01109784_PH_2_DMP8/low_quality_saver_pipeline/04a_Consensus_TraceReview/I_HC01109784/PH_2_DMP8_consensus.fa",
+    "III_PipelineOutput/HC01109784_PH_3_DMP8/low_quality_saver_pipeline/04a_Consensus_TraceReview/I_HC01109784/PH_3_DMP8_consensus.fa",
+]
+
+# Final paralog-specificity check on the stitched PH_DMP8_full_gene FASTA.
+# Replaces the skipped per-batch BLAST + per-pair consensus_blast: one BLAST
+# at the end, on the cleanest representation of the gene, against all 7
+# paralogs to confirm we recovered DMP8 (not a sister paralog).
+# Outputs go to <overlap_consensus.output_dir>/blast/.
+[overlap_consensus_blast]
+reference = "II_QualityClassified/PF05078_DMP_transcripts_cdhit.fa"  # falls back to [project].reference if omitted
+evalue    = "1e-10"
+word_size = 11
+which     = "both"   # reference_length | covered_span | both
