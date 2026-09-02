@@ -6,7 +6,7 @@
 #
 # For every amplicon present in BOTH batches (matched by the `ref=` accession
 # in each consensus FASTA header), the orchestrator calls
-# scripts/tri_consensus.py with:
+# scripts/tri_consensus/01_tri_consensus.py with:
 #   - sanger_a   : consensus FASTA from batch A
 #   - sanger_b   : consensus FASTA from batch B
 #   - reference  : reference FASTA shared between the two batches
@@ -30,9 +30,9 @@ output_dirname = "Tri_Consensus"
 [batch_a]
 id            = "HC01463503"
 # Directory holding the per-amplicon consensus FASTAs for batch A. Points at
-# 04a_Consensus_TraceReview because tri_consensus.py requires reference-length
-# inputs and the 04a files (built by step_merge_consensus.py or
-# curator_apply_overrides.py) are already projected onto reference coordinates.
+# 04a_Consensus_TraceReview because 01_tri_consensus.py requires reference-length
+# inputs and the 04a files (built by 07_step_merge_consensus.py or
+# 10_curator_apply_overrides.py) are already projected onto reference coordinates.
 # Relative paths are resolved against output_root.
 consensus_dir = "HC01463503/low_quality_saver_pipeline/04a_Consensus_TraceReview/I_HC01463503"
 # Reference directory used by batch A (the orchestrator only needs one of the
@@ -57,7 +57,7 @@ summary_filename = "tri_consensus_summary.tsv"
 [inputs]
 # Subfolder (under output_root/output_dirname) where the orchestrator stashes
 # a verbatim copy of every sanger_a / sanger_b / reference FASTA consumed by
-# tri_consensus.py. Each copy is renamed "<ref_accession>.<role>.<basename>"
+# 01_tri_consensus.py. Each copy is renamed "<ref_accession>.<role>.<basename>"
 # and its original filepath is recorded in `manifest_filename`.
 stash_dirname     = "_inputs"
 manifest_filename = "inputs_manifest.tsv"

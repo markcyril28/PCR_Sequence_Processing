@@ -105,7 +105,7 @@ choice = [
 #               per-consensus pairwise alignments.
 #   report    — summary CSV + run manifest
 #   build_report - invoke c_build_report.sh after the batch loop to produce the
-#               consolidated Markdown / PDF report (build_full_report.py +
+#               consolidated Markdown / PDF report (01_build_full_report.py +
 #               pandoc). Runs once across all batches, not per-batch.
 #
 # `mode` is a convenience preset; set to "custom" to honor the booleans below.

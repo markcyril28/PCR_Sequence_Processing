@@ -4,7 +4,8 @@
 #
 # Builds a majority-rule tri-consensus for every amplicon sequenced in BOTH
 # Sanger batches. For each shared amplicon (matched by the `ref=` accession in
-# each consensus FASTA header), the orchestrator calls scripts/tri_consensus.py
+# each consensus FASTA header), the orchestrator calls
+# scripts/tri_consensus/01_tri_consensus.py
 # with the two batch consensuses and the shared reference, and writes the
 # result to a single output folder under III_PipelineOutput/.
 #
@@ -35,7 +36,8 @@ wait_for_slot() { local limit="$1"; while (( $(jobs -rp | wc -l) >= limit )); do
 
 CONFIG="${1:-d_tri_consensus_pipeline_config.toml}"
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-SCRIPTS="$ROOT/scripts"
+COMMON_SCRIPTS="$ROOT/scripts/common"
+TRI_SCRIPTS="$ROOT/scripts/tri_consensus"
 
 _pick_python() {
   local cand
@@ -54,8 +56,8 @@ PYTHON="$(_pick_python)" || { echo "ERROR: need Python >= 3.11." >&2; exit 2; }
 
 [[ "$CONFIG" = /* ]] || CONFIG="$ROOT/$CONFIG"
 [[ -f "$CONFIG" ]] || { echo "ERROR: config not found: $CONFIG" >&2; exit 2; }
-[[ -f "$SCRIPTS/read_toml.py" ]]    || { echo "ERROR: missing scripts/read_toml.py" >&2; exit 2; }
-[[ -f "$SCRIPTS/tri_consensus.py" ]] || { echo "ERROR: missing scripts/tri_consensus.py" >&2; exit 2; }
+[[ -f "$COMMON_SCRIPTS/01_read_toml.py" ]] || { echo "ERROR: missing scripts/common/01_read_toml.py" >&2; exit 2; }
+[[ -f "$TRI_SCRIPTS/01_tri_consensus.py" ]] || { echo "ERROR: missing scripts/tri_consensus/01_tri_consensus.py" >&2; exit 2; }
 
 LOG_DIR="${LOG_DIR:-$ROOT/logs}"
 mkdir -p "$LOG_DIR"
@@ -67,7 +69,7 @@ log() { printf '[%s] %s\n' "$(date +%H:%M:%S)" "$*"; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
 # Load TOML into shell vars: KEY=value (uppercased, dots -> _).
-eval "$("$PYTHON" "$SCRIPTS/read_toml.py" "$CONFIG" --export)"
+eval "$("$PYTHON" "$COMMON_SCRIPTS/01_read_toml.py" "$CONFIG" --export)"
 
 # Use TOML blast.threads if set, otherwise fall back to nproc.
 BLAST_THREADS="${BLAST_THREADS:-$CPU}"
@@ -106,7 +108,7 @@ log "reference    : $A_REF_DIR"
 # Index each batch by reference accession parsed from the consensus header.
 # A consensus FASTA header looks like:
 #   >I_HC01463503|<amplicon> ref=<ref_accession> len=... ...
-# We extract <ref_accession> via the read_toml.py-companion helper below.
+# We extract <ref_accession> via the common/01_read_toml.py companion below.
 # ---------------------------------------------------------------------------
 extract_ref() {
   # Print the value of the `ref=` token in the FIRST header line, or "" if absent.
@@ -138,7 +140,7 @@ log "amplicons    : A=${#A_BY_REF[@]}  B=${#B_BY_REF[@]}"
 printf 'ref_accession\tsanger_a\tsanger_b\treference\tconsensus_fa\tagree_all\tsanger_variant\tsanger_assist\tref_fallback\tref_tiebreak\tstatus\n' > "$SUMMARY"
 
 # Manifest of copied input FASTAs (records the original filepath of every
-# sanger_a / sanger_b / reference consumed by tri_consensus.py).
+# sanger_a / sanger_b / reference consumed by 01_tri_consensus.py).
 INPUTS_MANIFEST="$INPUTS_DIR/${INPUTS_MANIFEST_FILENAME:-inputs_manifest.tsv}"
 printf 'ref_accession\trole\tcopied_to\toriginal_path\n' > "$INPUTS_MANIFEST"
 
@@ -202,7 +204,7 @@ for ref in "${!A_BY_REF[@]}"; do
 
   wait_for_slot "$MAX_PARALLEL"
   (
-    stats="$("$PYTHON" "$SCRIPTS/tri_consensus.py" \
+    stats="$("$PYTHON" "$TRI_SCRIPTS/01_tri_consensus.py" \
       --sanger-a   "$_a_fa" \
       --sanger-b   "$_b_fa" \
       --reference  "$_ref_fa" \
@@ -211,7 +213,7 @@ for ref in "${!A_BY_REF[@]}"; do
       --out-align  "$_out_aln" \
       --name       "${_ref}|${_A_ID}+${_B_ID}_tri_consensus" | tail -n +4)"
 
-    # tri_consensus.py prints "  CLASS: N" lines after the two "wrote" lines.
+    # 01_tri_consensus.py prints "  CLASS: N" lines after the two "wrote" lines.
     agree_all=$(printf '%s\n' "$stats" | awk '$1=="AGREE_ALL:" {print $2}')
     sanger_var=$(printf '%s\n' "$stats" | awk '$1=="SANGER_VARIANT:" {print $2}')
     sanger_ast=$(printf '%s\n' "$stats" | awk '$1=="SANGER_ASSIST_REF:" {print $2}')

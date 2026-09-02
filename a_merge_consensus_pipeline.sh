@@ -24,7 +24,8 @@ MAX_PARALLEL="$CPU"
 
 CONFIG="${1:-a_merge_consensus_config.toml}"
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-SCRIPTS="$ROOT/scripts"
+COMMON_SCRIPTS="$ROOT/scripts/common"
+MERGE_SCRIPTS="$ROOT/scripts/merge_consensus"
 _pick_python() {
   local cand
   for cand in "${PYTHON:-}" \
@@ -44,8 +45,8 @@ PYTHON="$(_pick_python)" || { echo "ERROR: need Python >= 3.11." >&2; exit 2; }
 [[ "$CONFIG" = /* ]] || CONFIG="$ROOT/$CONFIG"
 
 [[ -f "$CONFIG" ]] || { echo "ERROR: config not found: $CONFIG" >&2; exit 2; }
-[[ -f "$SCRIPTS/read_toml.py" ]]         || { echo "ERROR: missing scripts/read_toml.py" >&2; exit 2; }
-[[ -f "$SCRIPTS/pairwise_consensus.py" ]] || { echo "ERROR: missing scripts/pairwise_consensus.py" >&2; exit 2; }
+[[ -f "$COMMON_SCRIPTS/01_read_toml.py" ]] || { echo "ERROR: missing scripts/common/01_read_toml.py" >&2; exit 2; }
+[[ -f "$MERGE_SCRIPTS/01_pairwise_consensus.py" ]] || { echo "ERROR: missing scripts/merge_consensus/01_pairwise_consensus.py" >&2; exit 2; }
 
 # wait_for_slot: block until fewer than $1 background jobs are running.
 wait_for_slot() { local limit="$1"; while (( $(jobs -rp | wc -l) >= limit )); do sleep 0.5; done; }
@@ -62,8 +63,8 @@ log() { printf '[%s] %s\n' "$(date +%H:%M:%S)" "$*"; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
 # ------------------ load config -> shell vars -------------------------------
-# read_toml.py --export emits KEY=value lines (uppercased, dots -> _underscores)
-eval "$("$PYTHON" "$SCRIPTS/read_toml.py" "$CONFIG" --export)"
+# 01_read_toml.py --export emits KEY=value lines (uppercased, dots -> underscores)
+eval "$("$PYTHON" "$COMMON_SCRIPTS/01_read_toml.py" "$CONFIG" --export)"
 
 # Override MAX_PARALLEL with TOML value if set (PROJECT_THREADS key from [project]).
 if [[ -n "${PROJECT_THREADS:-}" && "$PROJECT_THREADS" -gt 0 ]] 2>/dev/null; then
@@ -71,7 +72,7 @@ if [[ -n "${PROJECT_THREADS:-}" && "$PROJECT_THREADS" -gt 0 ]] 2>/dev/null; then
 fi
 
 # [trim].enabled = false -> force q_cutoff to 0 (disables trimming in the
-# pairwise_consensus.py consumer). Default to disabled if section is missing.
+# 01_pairwise_consensus.py consumer). Default to disabled if section is missing.
 if [[ "${TRIM_ENABLED:-false}" != "true" ]]; then
   TRIM_Q_CUTOFF=0
 fi
@@ -85,8 +86,8 @@ PIPELINE_DIRNAME="$IO_PIPELINE_DIRNAME"
 mkdir -p "$OUTPUT_ROOT"
 
 # Read the [[batches]] table. Each row has per-batch overrides; defaults come
-# from [reads] (filled in by read_toml.py --batches).
-BATCHES_TSV="$("$PYTHON" "$SCRIPTS/read_toml.py" "$CONFIG" --batches)" \
+# from [reads] (filled in by 01_read_toml.py --batches).
+BATCHES_TSV="$("$PYTHON" "$COMMON_SCRIPTS/01_read_toml.py" "$CONFIG" --batches)" \
   || die "Failed to parse [[batches]] from $CONFIG"
 
 log "project       : $PROJECT_NAME"
@@ -194,7 +195,7 @@ while IFS=$'\t' read -r -a BR; do
 
       wait_for_slot "$MAX_PARALLEL"
       {
-        "$PYTHON" "$SCRIPTS/pairwise_consensus.py" \
+        "$PYTHON" "$MERGE_SCRIPTS/01_pairwise_consensus.py" \
           --forward-ab1   "$fwd" \
           --reverse-ab1   "$rev" \
           --out-fa        "$out_fa" \

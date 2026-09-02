@@ -13,6 +13,7 @@
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+INSIDE_PRIMER_SCRIPTS="$SCRIPT_DIR/scripts/inside_primer"
 CONFIG="${1:-$SCRIPT_DIR/f_inside_primer_pipeline_config.toml}"
 
 # -------------------- logging -----------------------------------------------
@@ -74,7 +75,7 @@ print(' '.join((cfg.get('run') or {}).get('operations') or []))
 " "$CONFIG")"
 
 if [[ -z "$RUN_OPERATIONS" ]] || [[ " $RUN_OPERATIONS " == *" overlap_consensus "* ]]; then
-  "$PYTHON_BIN" "$SCRIPT_DIR/scripts/overlap_consensus.py" \
+  "$PYTHON_BIN" "$INSIDE_PRIMER_SCRIPTS/01_overlap_consensus.py" \
     --workspace "$SCRIPT_DIR" \
     --config "$CONFIG"
 else
@@ -165,7 +166,7 @@ fi
 if [[ -n "${OC_OUT_DIR:-}" ]]; then
   OC_OUT_DIR_ABS="${OC_OUT_DIR_ABS:-$OC_OUT_DIR}"
   [[ "$OC_OUT_DIR_ABS" = /* ]] || OC_OUT_DIR_ABS="$SCRIPT_DIR/$OC_OUT_DIR_ABS"
-  "$PYTHON_BIN" "$SCRIPT_DIR/scripts/overlap_consensus_report.py" \
+  "$PYTHON_BIN" "$INSIDE_PRIMER_SCRIPTS/02_overlap_consensus_report.py" \
     --output-dir "$OC_OUT_DIR_ABS" \
     --workspace  "$SCRIPT_DIR"
 else
@@ -178,7 +179,7 @@ print((cfg.get('overlap_consensus') or {}).get('output_dir', ''))
 " "$CONFIG")"
   if [[ -n "$_OC_DIR" ]]; then
     [[ "$_OC_DIR" = /* ]] || _OC_DIR="$SCRIPT_DIR/$_OC_DIR"
-    [[ -d "$_OC_DIR" ]] && "$PYTHON_BIN" "$SCRIPT_DIR/scripts/overlap_consensus_report.py" \
+    [[ -d "$_OC_DIR" ]] && "$PYTHON_BIN" "$INSIDE_PRIMER_SCRIPTS/02_overlap_consensus_report.py" \
       --output-dir "$_OC_DIR" \
       --workspace  "$SCRIPT_DIR"
   fi

@@ -22,7 +22,8 @@ wait_for_slot() { local limit="$1"; while (( $(jobs -rp | wc -l) >= limit )); do
 
 CONFIG="${1:-b_low_quality_saver_pipeline_config.toml}"
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-SCRIPTS="$ROOT/scripts"
+COMMON_SCRIPTS="$ROOT/scripts/common"
+LQS_SCRIPTS="$ROOT/scripts/low_quality_saver"
 
 # -------------------- pick a Python 3.11+ interpreter -----------------------
 # The active conda env (e.g. pcr_sanger) may ship an old Python (3.5) that
@@ -65,7 +66,7 @@ echo "[log] writing to $LOG_FILE"
 
 # -------------------- load config -> shell vars -----------------------------
 # Produces variables like PROJECT_NAME, METHOD_CHOICE, RUN_MODE, BLAST_EVALUE...
-eval "$("$PYTHON" "$SCRIPTS/read_toml.py" "$CONFIG" --export)"
+eval "$("$PYTHON" "$COMMON_SCRIPTS/01_read_toml.py" "$CONFIG" --export)"
 
 # If TOML did not export PROJECT_THREADS (or it is zero), fall back to nproc.
 # Per-tool thread counts passed to Python steps use PROJECT_THREADS; parallel
@@ -138,8 +139,8 @@ REFERENCE="$ROOT/$PROJECT_REFERENCE"
 ensure_dir "$OUTPUT_ROOT"
 
 # Read the [[batches]] table. Each row carries the per-batch overrides; defaults
-# are pre-filled from [reads] by read_toml.py so every column is populated.
-BATCHES_TSV="$("$PYTHON" "$SCRIPTS/read_toml.py" "$CONFIG" --batches)" \
+# are pre-filled from [reads] by 01_read_toml.py so every column is populated.
+BATCHES_TSV="$("$PYTHON" "$COMMON_SCRIPTS/01_read_toml.py" "$CONFIG" --batches)" \
   || die "Failed to parse [[batches]] from $CONFIG"
 
 log "project        : $PROJECT_NAME"
@@ -216,7 +217,7 @@ while IFS=$'\t' read -r -a BR; do
     CLASSIFY_OUT_DIR="$CLASSIFY_DIR" \
     CLASSIFY_HIGH="$CLASSIFY_HIGH_THRESHOLD" \
     CLASSIFY_MED="$CLASSIFY_MEDIUM_THRESHOLD" \
-      "$PYTHON" "$SCRIPTS/step_classify.py" \
+      "$PYTHON" "$LQS_SCRIPTS/01_step_classify.py" \
         --sample-root    "$SAMPLE_ROOT" \
         --include        "$BATCH_SDIR" \
         --out-dir        "$CLASSIFY_DIR" \
@@ -254,11 +255,11 @@ while IFS=$'\t' read -r -a BR; do
     ensure_dir "$BLAST_TMP"
 
     # _blast_one_read <sample> <stem> <ab1> <fa> <db_dir>
-    # Runs ab1_to_fasta + blastn for a single read and writes one TSV row.
+    # Runs 02_ab1_to_fasta.py + blastn for one read and writes one TSV row.
     _blast_one_read() {
       local sample="$1" stem="$2" ab1="$3" fa="$4" db_dir="$5"
       local row_file="$BLAST_TMP/${sample}_${stem}.row"
-      "$PYTHON" "$SCRIPTS/ab1_to_fasta.py" --ab1 "$ab1" --out "$fa" --seq-id "$stem" \
+      "$PYTHON" "$LQS_SCRIPTS/02_ab1_to_fasta.py" --ab1 "$ab1" --out "$fa" --seq-id "$stem" \
         --trim-q "${TRIM_Q_CUTOFF:-0}" --trim-min-len "${TRIM_MIN_LEN:-50}"
       local hit
       hit=$(blastn -query "$fa" -db "$db_dir/ref" \
@@ -474,7 +475,7 @@ for method in $METHOD_CHOICE; do
 
     case "$method" in
       trace_review)
-        "$PYTHON" "$SCRIPTS/step_trace_review.py" \
+        "$PYTHON" "$LQS_SCRIPTS/03_step_trace_review.py" \
           --sample-root  "$SAMPLE_ROOT" \
           --include      "$BATCH_SDIR" \
           --reference    "$REFERENCE" \
@@ -495,7 +496,7 @@ for method in $METHOD_CHOICE; do
           --reverse-suffix="$BATCH_RSUFFIX"
         ;;
       consensus_assembly)
-        "$PYTHON" "$SCRIPTS/step_consensus_assembly.py" \
+        "$PYTHON" "$LQS_SCRIPTS/05_step_consensus_assembly.py" \
           --sample-root  "$SAMPLE_ROOT" \
           --include      "$BATCH_SDIR" \
           --reference    "$REFERENCE" \
@@ -515,7 +516,7 @@ for method in $METHOD_CHOICE; do
         ;;
       tracy_decompose)
         command -v tracy >/dev/null || die "tracy not found (run setup.sh)"
-        "$PYTHON" "$SCRIPTS/step_tracy_decompose.py" \
+        "$PYTHON" "$LQS_SCRIPTS/06_step_tracy_decompose.py" \
           --sample-root  "$SAMPLE_ROOT" \
           --include      "$BATCH_SDIR" \
           --reference    "$REFERENCE" \
@@ -550,7 +551,7 @@ for method in $METHOD_CHOICE; do
     else
       log "[4/6] consensus ($method) -> $CONSENSUS_DIR"
       ensure_dir "$CONSENSUS_DIR"
-      "$PYTHON" "$SCRIPTS/step_merge_consensus.py" \
+      "$PYTHON" "$LQS_SCRIPTS/07_step_merge_consensus.py" \
         --reference    "$REFERENCE" \
         --call-dir     "$CALL_DIR" \
         --assignments  "$BLAST_DIR/assignments.tsv" \
@@ -582,7 +583,7 @@ for method in $METHOD_CHOICE; do
       THREADS="$PROJECT_THREADS" \
       EVALUE="$BLAST_EVALUE" \
       WORD_SIZE="$BLAST_WORD_SIZE" \
-        bash "$SCRIPTS/blast_consensus.sh" "$CONSENSUS_DIR" "$CONSENSUS_BLAST_DIR" "$REFERENCE"
+        bash "$LQS_SCRIPTS/08_blast_consensus.sh" "$CONSENSUS_DIR" "$CONSENSUS_BLAST_DIR" "$REFERENCE"
     fi
   fi
 
@@ -595,7 +596,7 @@ done
   if [[ "$RUN_REPORT" == "true" ]]; then
     log "[6/6] report -> $REPORT_DIR"
     ensure_dir "$REPORT_DIR"
-    "$PYTHON" "$SCRIPTS/step_report.py" \
+    "$PYTHON" "$LQS_SCRIPTS/09_step_report.py" \
       --output-root  "$OUT_ROOT" \
       --classify-dir "$CLASSIFY_DIR" \
       --blast-dir    "$BLAST_DIR" \

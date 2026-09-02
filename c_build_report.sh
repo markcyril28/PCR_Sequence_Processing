@@ -13,14 +13,14 @@ set -Eeuo pipefail
 
 # -------------------- USER-EDITABLE CONFIG ----------------------------------
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-REPORT_PY="${REPORT_PY:-$ROOT/scripts/build_full_report.py}"
+REPORT_PY="${REPORT_PY:-$ROOT/scripts/reporting/01_build_full_report.py}"
 LOG_DIR="${LOG_DIR:-$ROOT/logs}"
-# build_full_report.py reads its batch list from this TOML's [[batches]] table
+# 01_build_full_report.py reads its batch list from this TOML's [[batches]] table
 # unless --batch is passed on the command line. Each batch gets its own report.
 LQS_CONFIG="${LQS_CONFIG:-$ROOT/b_low_quality_saver_pipeline_config.toml}"
-READ_TOML="${READ_TOML:-$ROOT/scripts/read_toml.py}"
+READ_TOML="${READ_TOML:-$ROOT/scripts/common/01_read_toml.py}"
 
-# Per-batch report dir layout (kept in sync with build_full_report.py constants):
+# Per-batch report dir layout (kept in sync with 01_build_full_report.py):
 #   III_PipelineOutput/<batch_id>/full_report/Report.md
 PIPELINE_OUTPUT_ROOT="III_PipelineOutput"
 REPORT_SUBDIR="full_report"
@@ -67,7 +67,7 @@ echo
 "$PY" "$REPORT_PY" --workspace "$ROOT" "$@" 2>&1 | tee "$LOG"
 
 # -------------------- resolve which batches were built ----------------------
-# Honor --batch on the CLI (mirrors build_full_report.py); otherwise iterate
+# Honor --batch on the CLI (mirrors 01_build_full_report.py); otherwise iterate
 # every [[batches]] entry from the LQS config so PDF conversion covers them all.
 CLI_BATCHES=()
 for arg in "$@"; do
