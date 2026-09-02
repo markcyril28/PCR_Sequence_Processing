@@ -81,7 +81,9 @@ for t in python blastn makeblastdb tracy; do
 done
 
 # Make every script executable (no-op on Windows but harmless).
-chmod +x "$(dirname "$0")"/*.sh "$(dirname "$0")"/scripts/*.py 2>/dev/null || true
+chmod +x "$(dirname "$0")"/*.sh 2>/dev/null || true
+find "$(dirname "$0")/scripts" -type f \( -name '*.py' -o -name '*.sh' \) \
+  -exec chmod +x {} + 2>/dev/null || true
 
 echo
 echo "[setup] Done. Next:"
