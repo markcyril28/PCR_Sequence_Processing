@@ -1,0 +1,95 @@
+# =============================================================================
+# a_merge_consensus_config.toml
+#
+# Configuration for a_merge_consensus_pipeline.sh - a standalone pipeline that
+# walks the QualityClassified/ tree, pairs every forward .ab1 with its
+# matching reverse .ab1, and emits a single F+R consensus FASTA per amplicon.
+#
+# Output is partitioned per Sanger sequencing batch:
+#   {io.output_root}/{batch.id}/{io.pipeline_dirname}/<tier>/<sample>/<amplicon>_consensus.fa
+# =============================================================================
+
+[project]
+name    = "SmelDMP_FR_Consensus"
+threads = 4
+
+[io]
+# Parent folder that already contains the per-tier subfolders
+# (1_HighQuality / 2_MediumQuality / 3_LowQuality).
+input_root       = "II_QualityClassified"
+# Top-level parent for outputs. Each [[batches]] entry writes into:
+#   {output_root}/{batch.id}/{pipeline_dirname}/...
+# so different Sanger batches never share a folder.
+output_root      = "III_PipelineOutput"
+pipeline_dirname = "merge_consensus_pipeline"
+# Tier subfolders to process (must exist under input_root). Any missing tier
+# is skipped silently.
+tiers       = [
+    "1_HighQuality",
+    "2_MediumQuality",
+    "3_LowQuality"
+]
+# Which [[batches]] entries to process this run. Comment a batch id out to
+# skip it without losing the [[batches]] block below. Removing the list (or
+# leaving it empty) processes every defined batch.
+active_batches = [
+    #"HC01463503",
+    "HC01468262",
+]
+
+[reads]
+# Default forward/reverse read identification. A [[batches]] entry may override
+# any of these per-batch when the lab uses a different filename convention.
+forward_glob   = "*_forward.ab1"
+forward_token  = "_forward.ab1"
+reverse_token  = "_reverse.ab1"
+
+# ---------------------------------------------------------------------------
+# [[batches]] — one per Sanger sequencing batch. Each batch is processed
+# independently, restricted to its own sample subfolder under each tier dir.
+# Field semantics mirror those in b_low_quality_saver_pipeline_config.toml.
+# ---------------------------------------------------------------------------
+[[batches]]
+id             = "HC01463503"
+sample_dir     = "I_HC01463503"
+
+[[batches]]
+id             = "HC01468262"
+sample_dir     = "I_HC01468262"
+forward_glob   = "*F.ab1"
+forward_token  = "F.ab1"
+reverse_token  = "R.ab1"
+
+[trim]
+# Mott end-trim before F+R merge. Set q_cutoff = 0 to disable.
+enabled  = true
+# *** CRITICAL *** end-trim Phred floor. Low-peak permissive: 10 (was 20).
+q_cutoff = 10
+min_len  = 50    # keep untrimmed if trim leaves fewer bases than this
+
+[consensus]
+# *** CRITICAL *** per-strand Phred floor; below -> N. Low-peak: 10 (was 20).
+min_quality  = 10
+# *** CRITICAL *** F/R conflict policy: higher_q | iupac | n.
+disagreement = "higher_q"
+min_overlap  = 10    # warn (don't drop) if F/R aligned overlap is shorter
+
+[align]
+# Biopython PairwiseAligner global alignment scoring.
+match_score    = 2
+mismatch_score = -1
+gap_open       = -4
+gap_extend     = -1
+
+[output]
+# Write a small per-pair stats file alongside each consensus FASTA.
+write_per_pair_report = true
+# Suffix appended to the amplicon stem for the consensus FASTA.
+# Example: "SmelDMP4_Primer4" + "_consensus.fa" -> "SmelDMP4_Primer4_consensus.fa"
+consensus_suffix = "_consensus.fa"
+report_suffix    = "_consensus.report.tsv"
+# Per-tier summary TSV (one row per amplicon pair).
+summary_filename = "merge_summary.tsv"
+
+[logging]
+level = "INFO"   # DEBUG | INFO | WARN | ERROR
